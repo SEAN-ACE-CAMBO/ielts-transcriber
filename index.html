@@ -287,9 +287,7 @@
     const wordCountEl = document.getElementById('wordCount');
     const wpmEl = document.getElementById('wpm');
 
-    // Anti-Duplication State Variables
-    let savedHistory = '';
-    let currentSessionFinal = '';
+    let finalTranscript = '';
     let isListening = false;
     let timerInterval = null;
     let secondsLeft = 120;
@@ -297,8 +295,7 @@
 
     startBtn.addEventListener('click', () => {
       if (isListening) return;
-      savedHistory = '';
-      currentSessionFinal = '';
+      finalTranscript = '';
       outputBox.innerText = '';
       secondsLeft = 120;
       totalSecondsSpoken = 0;
@@ -334,21 +331,24 @@
       }, 1000);
     }
 
-    // Handles live audio streaming without duplicating text across socket resets
+    // Handles live speech without duplicate phrase commits
     recognition.onresult = (event) => {
-      currentSessionFinal = '';
-      let currentSessionInterim = '';
+      let interimTranscript = '';
 
-      for (let i = 0; i < event.results.length; ++i) {
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const transcriptChunk = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          currentSessionFinal += event.results[i][0].transcript + ' ';
+          const cleanChunk = transcriptChunk.trim();
+          // Verify that this chunk is not an accidental duplicate from Chrome
+          if (cleanChunk && !finalTranscript.trim().endsWith(cleanChunk)) {
+            finalTranscript += cleanChunk + ' ';
+          }
         } else {
-          currentSessionInterim += event.results[i][0].transcript;
+          interimTranscript += transcriptChunk;
         }
       }
 
-      // Merge historical sessions with current session without repeating phrases
-      const fullText = (savedHistory + ' ' + currentSessionFinal + ' ' + currentSessionInterim).replace(/\s+/g, ' ').trim();
+      const fullText = (finalTranscript + ' ' + interimTranscript).replace(/\s+/g, ' ').trim();
       outputBox.innerText = fullText;
 
       const words = fullText ? fullText.split(/\s+/).filter(w => w.length > 0) : [];
@@ -365,10 +365,8 @@
       stopListening();
     };
 
-    // Safely commit finalized sentences to savedHistory whenever browser reconnects socket
+    // Auto-restart stream on pause without duplicating saved speech
     recognition.onend = () => {
-      savedHistory = (savedHistory + ' ' + currentSessionFinal).replace(/\s+/g, ' ').trim();
-      currentSessionFinal = '';
       if (isListening && secondsLeft > 0) {
         try { recognition.start(); } catch(e) {}
       }
@@ -468,7 +466,7 @@
 
       const clauses = text.split(/,|\.|and then|because|although|which|that|so/gi).filter(c => c.trim().length > 0);
       const complexConnectors = ['because', 'although', 'even though', 'whereas', 'while', 'if', 'unless', 'since', 'which', 'that', 'who', 'where', 'in order to', 'despite'];
-      
+
       const lowerText = text.toLowerCase();
       let foundComplex = complexConnectors.filter(c => lowerText.includes(c));
 
