@@ -274,7 +274,9 @@
     alert("Web Speech API is not supported in this browser. Try Google Chrome, Microsoft Edge, or Safari.");
   } else {
     const recognition = new SpeechRecognition();
-    recognition.continuous = true;
+    
+    // Setting continuous to FALSE fixes Chrome's internal socket buffer duplication bug!
+    recognition.continuous = false; 
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
@@ -287,7 +289,8 @@
     const wordCountEl = document.getElementById('wordCount');
     const wpmEl = document.getElementById('wpm');
 
-    let finalTranscript = '';
+    let masterTranscript = '';
+    let currentInterim = '';
     let isListening = false;
     let timerInterval = null;
     let secondsLeft = 120;
@@ -295,7 +298,8 @@
 
     startBtn.addEventListener('click', () => {
       if (isListening) return;
-      finalTranscript = '';
+      masterTranscript = '';
+      currentInterim = '';
       outputBox.innerText = '';
       secondsLeft = 120;
       totalSecondsSpoken = 0;
@@ -304,11 +308,9 @@
       wpmEl.innerText = "0";
       document.getElementById('feedback-container').style.display = 'none';
 
-      try {
-        recognition.start();
-        isListening = true;
-        startTimer();
-      } catch (e) { console.error("Start Error:", e); }
+      isListening = true;
+      try { recognition.start(); } catch (e) { console.error("Start Error:", e); }
+      startTimer();
     });
 
     stopBtn.addEventListener('click', () => stopListening());
@@ -331,27 +333,25 @@
       }, 1000);
     }
 
-    // Handles live speech without duplicate phrase commits
+    // Process speech chunks cleanly without Chrome buffering past phrases
     recognition.onresult = (event) => {
-      let interimTranscript = '';
+      currentInterim = '';
 
       for (let i = event.resultIndex; i < event.results.length; ++i) {
-        const transcriptChunk = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          const cleanChunk = transcriptChunk.trim();
-          // Verify that this chunk is not an accidental duplicate from Chrome
-          if (cleanChunk && !finalTranscript.trim().endsWith(cleanChunk)) {
-            finalTranscript += cleanChunk + ' ';
+          const chunk = event.results[i][0].transcript.trim();
+          if (chunk) {
+            masterTranscript += chunk + ' ';
           }
         } else {
-          interimTranscript += transcriptChunk;
+          currentInterim += event.results[i][0].transcript;
         }
       }
 
-      const fullText = (finalTranscript + ' ' + interimTranscript).replace(/\s+/g, ' ').trim();
-      outputBox.innerText = fullText;
+      const displayText = (masterTranscript + ' ' + currentInterim).replace(/\s+/g, ' ').trim();
+      outputBox.innerText = displayText;
 
-      const words = fullText ? fullText.split(/\s+/).filter(w => w.length > 0) : [];
+      const words = displayText ? displayText.split(/\s+/).filter(w => w.length > 0) : [];
       wordCountEl.innerText = words.length;
 
       if (totalSecondsSpoken > 0) {
@@ -365,10 +365,17 @@
       stopListening();
     };
 
-    // Auto-restart stream on pause without duplicating saved speech
+    // Seamlessly restart recognition loop when sentence completes
     recognition.onend = () => {
+      currentInterim = '';
       if (isListening && secondsLeft > 0) {
-        try { recognition.start(); } catch(e) {}
+        try { 
+          recognition.start(); 
+        } catch(e) {
+          setTimeout(() => {
+            if (isListening && secondsLeft > 0) try { recognition.start(); } catch(err) {}
+          }, 100);
+        }
       }
     };
 
