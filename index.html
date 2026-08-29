@@ -267,7 +267,7 @@
   dropdown.addEventListener('change', (e) => loadCueCard(e.target.value));
   loadCueCard(0);
 
-  // Speech Engine
+  // Speech Engine Configuration
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   if (!SpeechRecognition) {
@@ -287,7 +287,9 @@
     const wordCountEl = document.getElementById('wordCount');
     const wpmEl = document.getElementById('wpm');
 
-    let accumulatedTranscript = '';
+    // Anti-Duplication State Variables
+    let savedHistory = '';
+    let currentSessionFinal = '';
     let isListening = false;
     let timerInterval = null;
     let secondsLeft = 120;
@@ -295,7 +297,8 @@
 
     startBtn.addEventListener('click', () => {
       if (isListening) return;
-      accumulatedTranscript = '';
+      savedHistory = '';
+      currentSessionFinal = '';
       outputBox.innerText = '';
       secondsLeft = 120;
       totalSecondsSpoken = 0;
@@ -331,17 +334,26 @@
       }, 1000);
     }
 
+    // Handles live audio streaming without duplicating text across socket resets
     recognition.onresult = (event) => {
-      let interimTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) accumulatedTranscript += event.results[i][0].transcript + ' ';
-        else interimTranscript += event.results[i][0].transcript;
+      currentSessionFinal = '';
+      let currentSessionInterim = '';
+
+      for (let i = 0; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          currentSessionFinal += event.results[i][0].transcript + ' ';
+        } else {
+          currentSessionInterim += event.results[i][0].transcript;
+        }
       }
-      const fullText = accumulatedTranscript + interimTranscript;
+
+      // Merge historical sessions with current session without repeating phrases
+      const fullText = (savedHistory + ' ' + currentSessionFinal + ' ' + currentSessionInterim).replace(/\s+/g, ' ').trim();
       outputBox.innerText = fullText;
 
-      const words = fullText.trim().split(/\s+/).filter(w => w.length > 0);
+      const words = fullText ? fullText.split(/\s+/).filter(w => w.length > 0) : [];
       wordCountEl.innerText = words.length;
+
       if (totalSecondsSpoken > 0) {
         wpmEl.innerText = Math.round((words.length / totalSecondsSpoken) * 60);
       }
@@ -353,8 +365,13 @@
       stopListening();
     };
 
+    // Safely commit finalized sentences to savedHistory whenever browser reconnects socket
     recognition.onend = () => {
-      if (isListening && secondsLeft > 0) try { recognition.start(); } catch(e) {}
+      savedHistory = (savedHistory + ' ' + currentSessionFinal).replace(/\s+/g, ' ').trim();
+      currentSessionFinal = '';
+      if (isListening && secondsLeft > 0) {
+        try { recognition.start(); } catch(e) {}
+      }
     };
 
     // --- ANALYZER LOGIC ---
@@ -370,7 +387,6 @@
       analyzeVocabulary(text);
       analyzeGrammar(text);
 
-      // AI Call if API Key exists
       const apiKey = document.getElementById('api-key-input').value.trim();
       if (apiKey) {
         callGeminiAI(text, apiKey);
@@ -383,7 +399,6 @@
       const fluencyBadge = document.getElementById('fluency-badge');
       const fluencyDetails = document.getElementById('fluency-details');
 
-      // Filler words check
       const fillerList = ['um', 'uh', 'like', 'you know', 'actually', 'basically', 'so', 'kind of', 'sort of', 'i mean'];
       let foundFillers = [];
       const lowerText = text.toLowerCase();
@@ -394,7 +409,6 @@
         if (matches) foundFillers.push(`${filler} (${matches.length})`);
       });
 
-      // Cohesive connectors check
       const connectors = ['firstly', 'secondly', 'furthermore', 'moreover', 'however', 'consequently', 'on the other hand', 'for instance', 'in addition', 'overall', 'as a result'];
       let foundConnectors = connectors.filter(c => lowerText.includes(c));
 
@@ -425,11 +439,9 @@
       const uniqueWords = new Set(words);
       const diversity = totalWords > 0 ? Math.round((uniqueWords.size / totalWords) * 100) : 0;
 
-      // Advanced Vocab list check
       const advancedVocab = ['pivotal', 'profound', 'crucial', 'indispensable', 'substantially', 'significantly', 'reminisce', 'recollect', 'predominantly', 'notably', 'essential', 'beneficial', 'fascinating', 'breathtaking', 'enhance', 'foster', 'accumulate'];
       let foundAdvanced = Array.from(uniqueWords).filter(w => advancedVocab.includes(w));
 
-      // Repetition check
       let wordCounts = {};
       words.forEach(w => { if (w.length > 3) wordCounts[w] = (wordCounts[w] || 0) + 1; });
       let repeatedWords = Object.keys(wordCounts).filter(w => wordCounts[w] > 3);
@@ -454,7 +466,6 @@
       const grammarBadge = document.getElementById('grammar-badge');
       const grammarDetails = document.getElementById('grammar-details');
 
-      // Estimate sentence count by pauses / sub-clauses
       const clauses = text.split(/,|\.|and then|because|although|which|that|so/gi).filter(c => c.trim().length > 0);
       const complexConnectors = ['because', 'although', 'even though', 'whereas', 'while', 'if', 'unless', 'since', 'which', 'that', 'who', 'where', 'in order to', 'despite'];
       
@@ -472,7 +483,6 @@
       grammarDetails.innerHTML = `
         <p><b>Estimated Sentence/Clause Breakdown:</b> ~${clauses.length} distinct clauses detected.</p>
         <p><b>Complex Sentence Markers:</b> ${foundComplex.length > 0 ? foundComplex.map(c => `<span class="tag">${c}</span>`).join(' ') : '<span style="color:red;">No complex conjunctions detected. Try combining ideas using "Although", "Which", or "Because".</span>'}</p>
-        <p><i>Note: Native browser APIs check structural range. For precise tense error detection, use the Copy Prompt button below to run an LLM audit.</i></p>
       `;
     }
 
