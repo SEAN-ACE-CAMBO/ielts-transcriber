@@ -43,7 +43,6 @@
       border: 2px solid #ffffff;
     }
 
-    /* Protocol & Diagnostic Error Banner */
     .diag-banner {
       display: none;
       background: #fee2e2;
@@ -358,8 +357,6 @@
 
 <body>
   <div class="app-card">
-    
-    <!-- Diagnostic Warning Banner -->
     <div id="diag-banner" class="diag-banner"></div>
 
     <header>
@@ -503,7 +500,7 @@
 
     let recognition = null;
     let isRecording = false;
-    let accumulatedTranscript = '';
+    let baseText = '';
     let timerInterval = null;
     let secondsLeft = 120;
     let totalSecondsSpoken = 0;
@@ -559,18 +556,23 @@
       recognition.interimResults = true;
       recognition.lang = document.getElementById('lang-select').value;
 
+      // Cleaned duplicate-proof onresult listener
       recognition.onresult = (event) => {
-        let interim = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
+        let finalTranscript = '';
+        let interimTranscript = '';
+
+        for (let i = 0; i < event.results.length; i++) {
+          const textSegment = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            accumulatedTranscript += event.results[i][0].transcript + ' ';
+            finalTranscript += textSegment + ' ';
           } else {
-            interim += event.results[i][0].transcript;
+            interimTranscript += textSegment;
           }
         }
-        const cleanFullText = (accumulatedTranscript + interim).replace(/\s+/g, ' ').trim();
-        document.getElementById('result').innerText = cleanFullText;
-        updateMetrics(cleanFullText);
+
+        const fullText = (baseText + finalTranscript + interimTranscript).replace(/\s+/g, ' ').trim();
+        document.getElementById('result').innerText = fullText;
+        updateMetrics(fullText);
       };
 
       recognition.onerror = (event) => {
@@ -583,6 +585,9 @@
 
       recognition.onend = () => {
         if (isRecording && secondsLeft > 0) {
+          // Store existing text as base before restarting session to prevent missing speech
+          baseText = document.getElementById('result').innerText.trim();
+          if (baseText.length > 0) baseText += ' ';
           try { recognition.start(); } catch(e) {}
         } else {
           stopRecording();
@@ -603,7 +608,7 @@
     }
 
     function startRecording() {
-      accumulatedTranscript = '';
+      baseText = '';
       document.getElementById('result').innerText = '';
       secondsLeft = 120;
       totalSecondsSpoken = 0;
@@ -701,7 +706,7 @@
 
     function clearAll() {
       stopRecording();
-      accumulatedTranscript = '';
+      baseText = '';
       document.getElementById('result').innerText = '';
       document.getElementById('feedback-container').style.display = 'none';
       updateMetrics('');
