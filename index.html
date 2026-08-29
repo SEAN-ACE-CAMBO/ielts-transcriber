@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IELTS Speaking Task 2 Transcriber</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 30px 15px;
+      background-color: #f4f4f9;
+      color: #333;
+    }
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .topic-selector {
+      margin-bottom: 15px;
+      text-align: left;
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 5px;
+    }
+    select {
+      width: 100%;
+      padding: 10px;
+      font-size: 15px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      background: #fff;
+      cursor: pointer;
+    }
+    .cue-card {
+      background: #fffbe6;
+      border: 1px solid #ffe58f;
+      border-left: 5px solid #faad14;
+      padding: 15px;
+      border-radius: 6px;
+      text-align: left;
+      margin-bottom: 20px;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+    .cue-card h3 {
+      margin-top: 0;
+      color: #d48806;
+    }
+    .cue-card ul {
+      margin: 8px 0 0 20px;
+      padding: 0;
+    }
+    .timer {
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: #d9534f;
+      margin: 15px 0;
+      font-family: monospace;
+    }
+    .stats-bar {
+      display: flex;
+      justify-content: space-around;
+      margin: 15px 0;
+      font-weight: bold;
+      background: #eef2f5;
+      padding: 10px;
+      border-radius: 6px;
+    }
+    #output-box {
+      width: 100%;
+      box-sizing: border-box;
+      height: 180px;
+      margin: 15px 0;
+      padding: 15px;
+      background: #fafafa;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      text-align: left;
+      overflow-y: auto;
+      font-size: 16px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    button {
+      padding: 12px 20px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      margin: 5px;
+    }
+    .start-btn { background-color: #4CAF50; color: white; }
+    .stop-btn { background-color: #f44336; color: white; }
+    .copy-btn { background-color: #007bff; color: white; width: 100%; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>IELTS Task 2 Speech Transcriber</h1>
+  
+  <!-- Topic Selection -->
+  <div class="topic-selector">
+    <label for="topic-dropdown">Choose an IELTS Task 2 Topic:</label>
+    <select id="topic-dropdown">
+      <option value="0">Topic 1: A Person Who Inspired You</option>
+      <option value="1">Topic 2: A Memorable Place You Visited</option>
+      <option value="2">Topic 3: An Important Decision You Made</option>
+      <option value="3">Topic 4: A Useful Skill You Learned</option>
+      <option value="4">Topic 5: A Piece of Technology You Use</option>
+      <option value="5">Topic 6: A Memorable Event or Celebration</option>
+    </select>
+  </div>
+
+  <!-- Display Active Cue Card -->
+  <div class="cue-card" id="cue-card-display">
+    <h3 id="card-title"></h3>
+    <div id="card-bullets"></div>
+  </div>
+
+  <p>Click <b>Start Listening</b> and speak your 2-minute answer.</p>
+
+  <div class="timer" id="timer">02:00</div>
+
+  <button class="start-btn" id="start-btn">Start Listening</button>
+  <button class="stop-btn" id="stop-btn">Stop Listening</button>
+
+  <div class="stats-bar">
+    <div>Words: <span id="wordCount">0</span></div>
+    <div>Speed: <span id="wpm">0</span> WPM</div>
+  </div>
+
+  <div id="output-box">Your transcribed response will appear here in real time...</div>
+
+  <button class="copy-btn" id="copy-btn">Copy Transcript & Prompt for IELTS Feedback</button>
+</div>
+
+<script>
+  // 6 Pre-configured IELTS Task 2 Cue Cards
+  const ieltsTopics = [
+    {
+      title: "Describe a person who has had a strong influence on your life.",
+      bullets: [
+        "Who this person is",
+        "How you know them",
+        "What kind of person they are",
+        "And explain why they have influenced you so much."
+      ]
+    },
+    {
+      title: "Describe a place you visited that left a strong impression on you.",
+      bullets: [
+        "Where this place is located",
+        "When and with whom you went there",
+        "What you did while you were there",
+        "And explain why it left such a memorable impression."
+      ]
+    },
+    {
+      title: "Describe an important decision you made in your life.",
+      bullets: [
+        "What the decision was about",
+        "When and how you made it",
+        "What the result or outcome was",
+        "And explain why this decision was so important to you."
+      ]
+    },
+    {
+      title: "Describe a useful skill you learned recently.",
+      bullets: [
+        "What the skill is",
+        "How and where you learned it",
+        "How long it took you to learn it",
+        "And explain why you feel this skill is useful."
+      ]
+    },
+    {
+      title: "Describe a piece of technology or electronic device you find very useful.",
+      bullets: [
+        "What the device is",
+        "What you primarily use it for",
+        "How often you use it",
+        "And explain why you find it so useful in your daily life."
+      ]
+    },
+    {
+      title: "Describe a memorable event or celebration you attended.",
+      bullets: [
+        "What the event or celebration was",
+        "Where and when it took place",
+        "Who was there with you",
+        "And explain why this event was so memorable to you."
+      ]
+    }
+  ];
+
+  const dropdown = document.getElementById('topic-dropdown');
+  const cardTitle = document.getElementById('card-title');
+  const cardBullets = document.getElementById('card-bullets');
+
+  // Render Cue Card based on selection
+  function loadCueCard(index) {
+    const topic = ieltsTopics[index];
+    cardTitle.innerText = topic.title;
+    cardBullets.innerHTML = "<b>You should say:</b><ul>" + 
+      topic.bullets.map(b => `<li>${b}</li>`).join('') + 
+      "</ul>";
+  }
+
+  dropdown.addEventListener('change', (e) => {
+    loadCueCard(e.target.value);
+  });
+
+  // Initial load
+  loadCueCard(0);
+
+  // Speech Recognition Engine
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    alert("Web Speech API is not supported in this browser. Try Google Chrome, Microsoft Edge, or Safari.");
+  } else {
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const copyBtn = document.getElementById('copy-btn');
+    const outputBox = document.getElementById('output-box');
+    const timerEl = document.getElementById('timer');
+    const wordCountEl = document.getElementById('wordCount');
+    const wpmEl = document.getElementById('wpm');
+
+    let accumulatedTranscript = '';
+    let isListening = false;
+    let timerInterval = null;
+    let secondsLeft = 120;
+    let totalSecondsSpoken = 0;
+
+    startBtn.addEventListener('click', () => {
+      if (isListening) return;
+      
+      accumulatedTranscript = '';
+      outputBox.innerText = '';
+      secondsLeft = 120;
+      totalSecondsSpoken = 0;
+      timerEl.innerText = "02:00";
+      wordCountEl.innerText = "0";
+      wpmEl.innerText = "0";
+
+      try {
+        recognition.start();
+        isListening = true;
+        startTimer();
+      } catch (e) {
+        console.error("Start Error:", e);
+      }
+    });
+
+    stopBtn.addEventListener('click', () => {
+      stopListening();
+    });
+
+    function stopListening() {
+      isListening = false;
+      clearInterval(timerInterval);
+      try { recognition.stop(); } catch(e) {}
+    }
+
+    function startTimer() {
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        secondsLeft--;
+        totalSecondsSpoken++;
+
+        let min = Math.floor(secondsLeft / 60);
+        let sec = secondsLeft % 60;
+        timerEl.innerText = `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+
+        if (secondsLeft <= 0) {
+          stopListening();
+        }
+      }, 1000);
+    }
+
+    recognition.onresult = (event) => {
+      let interimTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          accumulatedTranscript += event.results[i][0].transcript + ' ';
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+
+      const fullText = accumulatedTranscript + interimTranscript;
+      outputBox.innerText = fullText;
+
+      const words = fullText.trim().split(/\s+/).filter(w => w.length > 0);
+      wordCountEl.innerText = words.length;
+
+      if (totalSecondsSpoken > 0) {
+        wpmEl.innerText = Math.round((words.length / totalSecondsSpoken) * 60);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech Recognition Error:", event.error);
+      
+      if (event.error === 'service-not-allowed') {
+        outputBox.innerHTML = `<span style="color:red; font-weight:bold;">Error: service-not-allowed</span><br><br>` +
+          `Google Chrome blocks speech recognition on local files (<code>file://</code>).<br><br>` +
+          `Please host this file on GitHub Pages, CodePen, or run it via a local server.`;
+      } else if (event.error === 'not-allowed') {
+        outputBox.innerText = "Error: Microphone permission was denied. Please allow microphone access in your browser settings.";
+      } else {
+        outputBox.innerText = `Error: ${event.error}`;
+      }
+      stopListening();
+    };
+
+    recognition.onend = () => {
+      if (isListening && secondsLeft > 0) {
+        try { recognition.start(); } catch(e) {}
+      }
+    };
+
+    copyBtn.addEventListener('click', () => {
+      const text = outputBox.innerText;
+      const wpm = wpmEl.innerText;
+      const selectedTopic = ieltsTopics[dropdown.value].title;
+
+      const prompt = `Please evaluate my IELTS Speaking Task 2 transcript based on official IELTS rubrics.\n\nTask 2 Topic:\n"${selectedTopic}"\n\nDelivery Metrics:\n- Fluency Speed: ${wpm} WPM (Target for Band 7+: 130–150 WPM)\n\nTranscript:\n"${text}"\n\nPlease evaluate:\n1. Task Achievement & Coherence (Relevance to the cue card prompts, structure)\n2. Lexical Resource (Collocations, advanced vocabulary, precision, repetition)\n3. Grammatical Range & Accuracy (Tense consistency, complex sentences, self-corrections)\n4. Estimated Band Score & Specific Key Improvements`;
+
+      navigator.clipboard.writeText(prompt);
+      alert("Transcript, selected topic, and prompt copied to clipboard! Paste it directly into our chat.");
+    });
+  }
+</script>
+
+</body>
+</html>
